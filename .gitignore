@@ -1,0 +1,23 @@
+# Secrets — NEVER commit
+.env
+.secrets/
+*sa*.json
+*service-account*.json
+*service_account*.json
+*-credentials.json
+credentials.json
+*.pem
+*.p12
+
+# Your live config (copy config.example.json -> config.json and fill it in)
+config.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS noise
+.DS_Store
+Thumbs.db

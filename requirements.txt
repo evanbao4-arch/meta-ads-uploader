@@ -1,0 +1,12 @@
+# Meta Ads Uploader — runtime dependencies.
+# Pinned to the versions this was built and tested against (>= so patch fixes apply).
+
+requests>=2.34.2
+python-dotenv>=1.2.2
+
+# Optional — only needed for authenticated Google Drive downloads (private files of
+# any size). Skip these and the tool still works with public URLs and local files.
+google-api-python-client>=2.197.0
+google-auth>=2.55.0
+google-auth-oauthlib>=1.4.0
+google-auth-httplib2>=0.4.0
