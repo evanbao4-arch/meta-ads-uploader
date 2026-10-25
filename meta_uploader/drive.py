@@ -347,7 +347,7 @@ def download_file(
     if dest:
         path = dest
     else:
-        fd, path = tempfile.mkstemp(suffix=suffix, prefix="tcc_drive_")
+        fd, path = tempfile.mkstemp(suffix=suffix, prefix="meta_drive_")
         os.close(fd)
 
     request = service.files().get_media(fileId=file_id, supportsAllDrives=True)

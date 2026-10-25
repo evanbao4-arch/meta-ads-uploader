@@ -43,6 +43,10 @@ class Config:
     instagram_actor_id: str
     default_link_url: str
     graph_api_version: str
+    # Optional: Meta's "Ad transparency" advertiser id. Some regions (e.g.
+    # Australia, from ~Sep 2026) won't deliver a NEW ad set without it. Read it
+    # off an existing ad set's regional_regulation_identities.universal_beneficiary.
+    advertiser_identity_id: str = ""
     # Optional: path to a Google service-account JSON key. When set, private
     # Google Drive assets are streamed straight into the upload via the
     # authenticated Drive API. Unset is fine — the tool falls back to the
@@ -140,6 +144,7 @@ def load_config(env_path: Path = ENV_PATH, config_path: Path = CONFIG_PATH) -> C
         instagram_actor_id=instagram_actor_id,
         default_link_url=default_link_url,
         graph_api_version=graph_api_version,
+        advertiser_identity_id=str(raw.get("advertiser_identity_id", "")).strip(),
         google_application_credentials=gac,
         google_oauth_client=oauth_client,
         google_oauth_token=oauth_token,

@@ -18,7 +18,14 @@ def create_creative(
     asset: dict,
     copy: dict,
 ) -> str:
-    payload = build_creative_payload(name, page_id, instagram_actor_id, asset, copy)
+    payload = build_creative_payload(
+        name,
+        page_id,
+        instagram_actor_id,
+        asset,
+        copy,
+        degrees_of_freedom_spec=advantage_plus_optout_spec(),
+    )
     resp = client.post(f"{client.account_id}/adcreatives", data=payload)
     return resp["id"]
 
@@ -69,11 +76,22 @@ def create_adset(
     billing_event: str = "IMPRESSIONS",
     daily_budget: int | None = None,
     targeting: dict | None = None,
+    promoted_object: dict | None = None,
+    advertiser_identity_id: str | None = None,
 ) -> str:
     """Create a PAUSED ad set under an existing campaign, with Advantage+ audience OFF.
 
     daily_budget is in the account's minor units (e.g. cents). Raises NEEDS_INPUT
     listing what's still required, rather than guessing targeting/budget.
+
+    promoted_object carries the conversion target for a sales ad set, e.g.
+    {"pixel_id": "...", "custom_event_type": "PURCHASE"}. Meta rejects
+    OFFSITE_CONVERSIONS without it.
+
+    advertiser_identity_id fills Meta's "Ad transparency" advertiser/payer, which
+    some regions (e.g. Australia, from ~Sep 2026) require before a NEW ad set can
+    deliver. Copy it off an existing ad set's
+    regional_regulation_identities.universal_beneficiary.
     """
     targeting = dict(targeting or {})
     ta = dict(targeting.get("targeting_automation") or {})
@@ -85,6 +103,8 @@ def create_adset(
         missing.append("daily_budget")
     if not targeting.get("geo_locations"):
         missing.append("targeting (at least geo_locations)")
+    if optimization_goal == "OFFSITE_CONVERSIONS" and not promoted_object:
+        missing.append("promoted_object (pixel_id + custom_event_type for conversions)")
     if missing:
         raise MetaError(
             "Missing settings to create a new ad set.",
@@ -92,18 +112,23 @@ def create_adset(
             fix="Provide: " + ", ".join(missing),
         )
 
-    resp = client.post(
-        f"{client.account_id}/adsets",
-        data={
-            "name": name,
-            "campaign_id": campaign_id,
-            "optimization_goal": optimization_goal,
-            "billing_event": billing_event,
-            "daily_budget": daily_budget,
-            "targeting": targeting,
-            "status": "PAUSED",
-        },
-    )
+    data = {
+        "name": name,
+        "campaign_id": campaign_id,
+        "optimization_goal": optimization_goal,
+        "billing_event": billing_event,
+        "daily_budget": daily_budget,
+        "targeting": targeting,
+        "status": "PAUSED",
+    }
+    if promoted_object:
+        data["promoted_object"] = promoted_object
+    if advertiser_identity_id:
+        data["regional_regulation_identities"] = {
+            "universal_beneficiary": advertiser_identity_id,
+            "universal_payer": advertiser_identity_id,
+        }
+    resp = client.post(f"{client.account_id}/adsets", data=data)
     return resp["id"]
 
 
