@@ -125,7 +125,7 @@ def resolve_asset(
     if suffix == ".bin":
         suffix = ""
 
-    fd, path = tempfile.mkstemp(suffix=suffix, prefix="tcc_asset_")
+    fd, path = tempfile.mkstemp(suffix=suffix, prefix="meta_asset_")
     with os.fdopen(fd, "wb") as fh:
         for chunk in resp.iter_content(chunk_size=65536):
             fh.write(chunk)
@@ -146,6 +146,40 @@ def upload_image(client: GraphClient, file_path: str) -> dict:
     return {"image_hash": first["hash"]}
 
 
+CHUNKED_UPLOAD_THRESHOLD = 40 * 1024 * 1024
+
+
+def _upload_video_chunked(client: GraphClient, file_path: str, on_progress=None) -> str:
+    """Meta's resumable upload: start -> transfer (Meta names each byte range) -> finish."""
+    endpoint = f"{client.account_id}/advideos"
+    size = os.path.getsize(file_path)
+    start = client.post(endpoint, data={"upload_phase": "start", "file_size": size})
+    session_id, video_id = start.get("upload_session_id"), start.get("video_id")
+    if not session_id or not video_id:
+        raise MetaError(
+            "Video upload failed (Meta did not open an upload session).",
+            code="ASSET_REJECTED",
+        )
+    lo, hi = int(start["start_offset"]), int(start["end_offset"])
+    with open(file_path, "rb") as fh:
+        while lo < hi:
+            fh.seek(lo)
+            resp = client.post(
+                endpoint,
+                data={
+                    "upload_phase": "transfer",
+                    "upload_session_id": session_id,
+                    "start_offset": lo,
+                },
+                files={"video_file_chunk": ("chunk", fh.read(hi - lo))},
+            )
+            lo, hi = int(resp["start_offset"]), int(resp["end_offset"])
+            if on_progress:
+                on_progress(f"uploaded {lo // (1024 * 1024)}/{size // (1024 * 1024)}MB")
+    client.post(endpoint, data={"upload_phase": "finish", "upload_session_id": session_id})
+    return video_id
+
+
 def upload_video(
     client: GraphClient,
     file_path: str,
@@ -153,9 +187,14 @@ def upload_video(
     poll_interval: int = 5,
     on_progress=None,
 ) -> dict:
-    with open(file_path, "rb") as fh:
-        resp = client.post(f"{client.account_id}/advideos", files={"file": fh})
-    video_id = resp.get("id")
+    # Meta's single-request endpoint answers HTTP 413 somewhere under ~100MB.
+    # Big files go up in chunks instead, so the original is never re-encoded.
+    if os.path.getsize(file_path) > CHUNKED_UPLOAD_THRESHOLD:
+        video_id = _upload_video_chunked(client, file_path, on_progress)
+    else:
+        with open(file_path, "rb") as fh:
+            resp = client.post(f"{client.account_id}/advideos", files={"file": fh})
+        video_id = resp.get("id")
     if not video_id:
         raise MetaError(
             "Video upload failed (no video id returned).",

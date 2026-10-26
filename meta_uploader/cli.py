@@ -229,6 +229,8 @@ def cmd_create_adset(args, cfg: Config) -> dict:
         billing_event=args.billing_event,
         daily_budget=args.daily_budget,
         targeting=targeting,
+        promoted_object=json.loads(args.promoted_object) if args.promoted_object else None,
+        advertiser_identity_id=cfg.advertiser_identity_id,
     )
     return {
         "adset_id": adset_id,
@@ -365,6 +367,10 @@ def cmd_create_from_json(args, cfg: Config) -> dict:
             na.get("billing_event", "IMPRESSIONS"),
             daily_budget=na.get("daily_budget"),
             targeting=na.get("targeting"),
+            promoted_object=na.get("promoted_object"),
+            advertiser_identity_id=na.get(
+                "advertiser_identity_id", cfg.advertiser_identity_id
+            ),
         )
         created_adset = {
             "adset_id": adset_id,
@@ -450,7 +456,12 @@ def _build_and_create(
     new_adset=None,
 ) -> dict:
     creative_payload = creative_mod.build_creative_payload(
-        name, cfg.page_id, cfg.instagram_actor_id, asset, copy
+        name,
+        cfg.page_id,
+        cfg.instagram_actor_id,
+        asset,
+        copy,
+        degrees_of_freedom_spec=creative_mod.advantage_plus_optout_spec(),
     )
     ad_payload = {
         "name": name,
@@ -467,7 +478,7 @@ def _build_and_create(
             "adcreatives_payload": creative_payload,
             "ads_payload": ad_payload,
             "advantage_plus": (
-                "per-feature opt-out pending (Meta deprecated the blanket field); "
+                "every Advantage+ creative enhancement opted out per feature; "
                 "effective state read back after create"
             ),
         }
@@ -495,7 +506,7 @@ def _build_and_create(
         "status": "PAUSED",
         "ads_manager_url": ads_url,
         "advantage_plus": {
-            "note": "blanket opt-out deprecated by Meta; per-feature opt-out pending",
+            "note": "every Advantage+ creative enhancement opted out per feature",
             "effective": effective,
         },
     }
@@ -555,6 +566,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--billing-event", default="IMPRESSIONS")
     sp.add_argument("--daily-budget", type=int, help="Minor units (e.g. cents).")
     sp.add_argument("--targeting-json", help="Path to a targeting JSON file.")
+    sp.add_argument(
+        "--promoted-object",
+        help='Conversion target as JSON, e.g. \'{"pixel_id": "123", "custom_event_type": "PURCHASE"}\'. '
+        "Required for the default OFFSITE_CONVERSIONS goal.",
+    )
     sp.add_argument("--dry-run", action="store_true")
 
     sp = sub.add_parser("create-ad", help="Create a PAUSED ad in an existing ad set.")
