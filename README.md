@@ -225,3 +225,7 @@ meta_uploader/
   ads.py        # create creative / ad / ad set — always PAUSED
 requirements.txt · config.example.json · TOKEN-SETUP.md · DRIVE-SETUP.md
 ```
+
+## Licence
+
+MIT. Free to use, change and share. See `LICENSE`. It comes with no warranty: you check every ad before it goes live.
